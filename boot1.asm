@@ -2,6 +2,15 @@
 [ORG 0x7C00]
 
 start:
+	; clear the Direction Flag (DF = 0) so memory ops go forward
+	cld
+	; when writing a function to print text to the screen or copy sectors of memory around,
+	; we rely on loadsb (Load String Byte) or movsb (Move String Byte) instructions.
+	; When Direction Flag = 0 (cld), loadsb reads a byte at si register and automatically
+	;-adds 1 to it point to next character.
+	; If DF is left at 1 (std), loadsb would read the byte and subsctract 1 from si, reading
+	;-string backwards.
+
 	; clearing segment registers as the BIOS state is undefined
 	xor ax, ax
 	mov ds, ax
@@ -16,6 +25,8 @@ start:
 	mov dl, [boot_drive] 	; restore drive number into dl (Data low)
 	mov ah, 0x42		; function 0x42 = extended read
 	int 0x13		; does the disk read
+
+	jc disk_error		; jump to an error handler if the read failed
 
 	jmp 0x7E00		; jump to stage 2
 hang:
