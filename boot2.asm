@@ -11,6 +11,84 @@ start:
 	;-"Set Video Mode"
 	; al = 0x00 : for quering card info
 	mov bx, 0x4114 ; bx means base register ( BL | BH )
-	; 0x0114 is the VESA Mode ID, 0x114 is the standard ID for 800x600 resolution with 16-bit color (RGB565)
+	; 0x0114 is the VESA Mode ID, 0x114 is the standard ID for 800x600 resolution with 32 bits per pixel, means 4 bytes per pixel. 
 	; 0x4000 sets Bit 14. Linear Framebuffer (LFB) flag.
+	int 0x10 ; call bios video services
 
+; gdt ( Global Descripter Table )
+gdt_start:
+	; the null descriptor,
+	; CPU requires the very first card in the list to be invalid.
+	gdt_null:
+		dq 0x0000000000000000
+
+	gdt_code:
+		dw 0xFFFF	; limit low
+		dw 0x0000	; base low
+		db 0x00		; base middle
+		db 10011010b	; access byte
+		db 11001111b	; flags + limit high
+		db 0x00		; base high
+
+	; Access byte for code,
+	;	1 -> segment is present in memory
+	;	00 -> ring 0 privilege level
+	;	1 -> this is code/data segment (not a system segment)
+	;	1 -> this is a code segment (executable)
+	;	0 -> not conforming (only runs at its privilege level)
+	;	1 -> readable ( code can be read as data )
+	;	0 -> accessed bit, CPU sets this, we leave it at 0
+
+	; Base (where memory starts)
+	; 0x00 + 0x00 + 0x0000 = 0x00000000
+	; The Limit (How big the memory is)
+	; 0xFFFF(limit low) + last 4 bits of db 11001111b(limit high)
+	; 0xFFFF + 0x0000F = 0xFFFFF ( around 1 MB )
+	
+	; in db 11001111b, the very first 1 in 1100 is the
+	;-Granularity Flag. It tells the CPU to treat the limit not
+	;-as single bytes, but as 4KB blocks.
+	; Now 1MB limit expands to 4GB.
+
+	gdt_data:
+		dw 0xFFFF	; limit low
+		dw 0x0000	; base low
+		db 0x00		; base middle
+		db 10010010b	; access byte
+		db 11001111b	; flags + limit high
+		db 0x00		; base high
+
+	; Access byte for data,
+	;	1 -> present
+	;	00 -> ring 0
+	;	1 -> code/data segment
+	;	0 -> data segment ( not executable )
+	;	0 -> expand up ( stack direction )
+	;	1 -> writable
+	;	0 -> accessed bit
+
+	; The flags byte
+	;	1 -> granularity: limit is in 4KB pages and not bytes
+	;	1 -> 32-bit protected mode segment
+	;	0 -> not 64-bit ( for now ig )
+	;	0 -> reserved
+	;	1111 -> upper 4 bits of the limit
+	
+	; Both Code and Data say they start at address 0 and spans
+	;-the entire 4 GB of memory. This is a perfect overlap that
+	;-creates two difference sets of rules (one for executing and
+	;-one for writing.). This is called the 'Flat Memory Model'.
+
+	gdt_end:
+
+		gdt_descriptor:
+			dw gdt_end - gdt_start - 1 ; size of GDT - 1
+			dd gdt_start	; address of GDT
+	
+	; lgdt is a special CPU instruction (Load GDT).
+	; It reads the gdt_descriptor structure and stores the GDT
+	;-location and size into a special internal CPU register
+	;-called the GDTR. The CPU will reference this register
+	;-every single time it needs to look up a segment descriptor
+
+	lgdt [gdt_descriptor]
