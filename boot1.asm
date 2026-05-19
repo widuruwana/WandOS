@@ -12,10 +12,10 @@ start:
 	;-string backwards.
 
 	; clearing segment registers as the BIOS state is undefined
-	xor ax, ax
-	mov ds, ax
-	mov es, ax
-	mov ss, ax
+	xor ax, ax ; accumulator Reg. ( AX, EAX in 32-bit and RAX in 64-bit)
+	mov ds, ax ; Segment Reg.
+	mov es, ax ; Extra segment reg.
+	mov ss, ax ; Stack segment reg.
 	mov sp, 0x7C00 ; stack grows downwards
 
 	mov [boot_drive], dl ; save the driver number gave by BIOS
@@ -29,6 +29,12 @@ start:
 	jc disk_error		; jump to an error handler if the read failed
 
 	jmp 0x7E00		; jump to stage 2
+
+disk_error:
+	mov ah, 0x0E	; BIOS teletype output function
+	mov al, 'E'	; Character 'E' for error
+	int 0x10	; Print char to screen
+
 hang:
 	hlt
 	jmp hang
