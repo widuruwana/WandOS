@@ -11,7 +11,8 @@ start:
 	;-"Set Video Mode"
 	; al = 0x00 : for quering card info
 	mov bx, 0x4114 ; bx means base register ( BL | BH )
-	; 0x0114 is the VESA Mode ID, 0x114 is the standard ID for 800x600 resolution with 32 bits per pixel, means 4 bytes per pixel. 
+	; 0x0114 is the VESA Mode ID, 0x114 is the standard ID for
+	;-800x600 resolution with 32 bits per pixel, means 4 bytes per pixel. 
 	; 0x4000 sets Bit 14. Linear Framebuffer (LFB) flag.
 	int 0x10 ; call bios video services
 
@@ -89,6 +90,52 @@ gdt_start:
 	; It reads the gdt_descriptor structure and stores the GDT
 	;-location and size into a special internal CPU register
 	;-called the GDTR. The CPU will reference this register
-	;-every single time it needs to look up a segment descriptor
-
+	;-every single time it needs to look up a segment descriptor.
 	lgdt [gdt_descriptor]
+	
+	; cr0 is a control register.You cannot mov a value directly
+	;-in to it. You have to read it, modify it, and write it back.
+	mov eax, cr0
+	or eax, 1
+	mov cr0, eax
+
+	; Bit 0 of cr0 is called the PE bit ( Protection Enable ).
+	; Flipping it to 1 switch the CPU from real mode to protected.
+
+	; ---> <---
+	; CPU has an internal pipeline that was already fetching &
+	;-decoding instructions assuming real mode. Flipping the PE
+	;-bit doesnt automatically flush that pipeline. Have to
+	;-perform a far jump immediately after setting the PE bit.
+	; far jump force the CPU to flush its pipeline and reload the
+	;-CS register from GDT, where then GDT takes effect.
+	jmp 0x08:protected_mode
+
+[BITS 32]
+protected_mode:
+	; reloading segment registers with data segment selectors
+	mov ax, 0x10
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	mov ss, ax
+	mov esp, 0x90000 ; new stack is set up in a safe location
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
