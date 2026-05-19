@@ -2,6 +2,10 @@
 [ORG 0x7E00]
 
 start:
+	; Enable A20 to use 0x100000 for loading ther Kernel
+	mov ax, 0x2401
+	int 0x15
+
 	; VESA BIOS Extension (VBE)
 	; VESA function: Set video mode
 	mov ax, 0x4F02
@@ -15,6 +19,22 @@ start:
 	;-800x600 resolution with 32 bits per pixel, means 4 bytes per pixel. 
 	; 0x4000 sets Bit 14. Linear Framebuffer (LFB) flag.
 	int 0x10 ; call bios video services
+
+	mov si, kernel_dap
+	mov ah, 0x42
+	mov dl, [0x500]
+	int 0x13
+
+	jmp setup_gdt
+
+; Loading the Kernal
+kernel_dap:
+	db 0x10
+	db 0x00
+	dw 64
+	dw 0x0010 ; offset
+	dw 0xFFFF ; destination
+	dq 5	; Kernel lives at sector 5
 
 ; gdt ( Global Descripter Table )
 gdt_start:
@@ -80,6 +100,14 @@ gdt_start:
 	;-creates two difference sets of rules (one for executing and
 	;-one for writing.). This is called the 'Flat Memory Model'.
 
+	gdt_code64:
+		dw 0xFFFF	; limit low
+		dw 0x0000	; base low
+		db 0x00		; base middle
+		db 10011010b	; access byte (same as 32-bit code)
+		db 10101111b	; flags: 64-bit flag set ( bit 5 )
+		db 0x00		; base high
+
 	gdt_end:
 
 		gdt_descriptor:
@@ -91,7 +119,8 @@ gdt_start:
 	;-location and size into a special internal CPU register
 	;-called the GDTR. The CPU will reference this register
 	;-every single time it needs to look up a segment descriptor.
-	lgdt [gdt_descriptor]
+	setup_gdt:
+		lgdt [gdt_descriptor]
 	
 	; cr0 is a control register.You cannot mov a value directly
 	;-in to it. You have to read it, modify it, and write it back.
@@ -114,6 +143,10 @@ gdt_start:
 [BITS 32]
 protected_mode:
 	; reloading segment registers with data segment selectors
+	; 0x10 -> 0000000000010000
+	; bits 15-3 -> 0000000000010 -> index 2 -> third entry in GDT -> gdt_data
+	; bits 2 -> 0 -> use GDT ( if 1 use Local Descripter Table [LDT] -> we dont use this)
+	; bits 1-0 -> 00 -> ring 0
 	mov ax, 0x10
 	mov ds, ax
 	mov es, ax
@@ -122,20 +155,56 @@ protected_mode:
 	mov ss, ax
 	mov esp, 0x90000 ; new stack is set up in a safe location
 
+	; CR3 Register - PML4 (Page Mape Level 4)
+	;	-> PDPT (Page Directory Pointer Table)
+	;		-> PD (Page Directory)
+	;			-> PT (Page Table)
+	;				-> Physical Page
 
+	; clear pages by zero out 12KB starting at 0x1000
+	mov edi, 0x1000		; edi -> destination index
+	mov cr3, edi		; CR3(control register 3) points at PML4
+	xor eax, eax		; eax -> accumulator register, ecx -> counter register
+	mov ecx, 3072		; 3072 * 4 bytes = 12KB
+	rep stosd		; repeat: store EAX into [EDI], advance EDI
+	mov edi, cr3		; resets EDI back to 0x1000
 
+	; PML4[0] points to PDPT at 0x2000
+	; flags: present (bit 0) + writable (bit 1) = 0x3
+	mov dword [0x1000], 0x2003
 
+	; PDPT[0] points at PD at 0x3000
+	mov dword [0x2000], 0x3003
 
+	; PD[0] points at first 2MB Using a huge page
+	; flags: present + writable + huge page (bit 7) = 0x83 (10000011)
+	mov dword [0x3000], 0x83
 
+	; Enable PAE (Physical address extension) - bit 5 of CR4
+	mov eax, cr4
+	or eax, 1 << 5
+	mov cr4, eax
 
+	; Enable long mode in EFER(Extended Feature Enable Register) MSR (0xC0000080)
+	mov ecx, 0xC0000080
+	rdmsr
+	or eax, 1 << 8
+	wrmsr
 
+	; Enable Paging
+	mov eax, cr0
+	or eax, 1 << 31
+	mov cr0, eax
 
+	jmp 0x18:long_mode
 
-
-
-
-
-
-
-
+[BITS 64]
+long_mode:
+	mov ax, 0x10
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	mov ss, ax
+	mov rsp, 0x90000 ; rsp instead of esp
 

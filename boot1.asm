@@ -18,11 +18,11 @@ start:
 	mov ss, ax ; Stack segment reg.
 	mov sp, 0x7C00 ; stack grows downwards
 
-	mov [boot_drive], dl ; save the driver number gave by BIOS
+	mov byte [0x500], dl ; save the driver number gave by BIOS
 	; Alse [something] functions as deferencing like the * in C.
 
 	mov si, dap		; source index points at the DAP (Disk Address Packet)
-	mov dl, [boot_drive] 	; restore drive number into dl (Data low)
+	mov dl, [0x500] 	; restore drive number into dl (Data low)
 	mov ah, 0x42		; function 0x42 = extended read
 	int 0x13		; does the disk read
 
@@ -39,8 +39,8 @@ hang:
 	hlt
 	jmp hang
 
-boot_drive:
-	db 0	; is just a byte initialized to 0. Thinks it just acts the same as a normal variable you initialize to store something.
+;boot_drive:
+	;db 0	; is just a byte initialized to 0. Thinks it just acts the same as a normal variable you initialize to store something.
 
 dap:
 	db 0x10		; packet size is 16 bytes, doesnt change
