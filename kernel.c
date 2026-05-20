@@ -1,5 +1,8 @@
-void kernel_main(){
-	unsigned char *fb = (unsigned char*)0xFD000000;
+void kernel_main(unsigned int *vbe_info){
+	unsigned int fb_addr = vbe_info[10]; // offset 40 -> 4 bytes x 10(th index of uint32 arr)
+	
+	unsigned char *fb = (unsigned char *)(unsigned long)fb_addr;
+	
 	int tot_bytes = 800 * 600 * 4;
 
 	for(int i = 0; i < tot_bytes; i += 4){
