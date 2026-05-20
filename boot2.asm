@@ -39,11 +39,12 @@ kernel_dap:
 	db 0x10
 	db 0x00
 	dw 64
-	dw 0x0010 ; offset
-	dw 0xFFFF ; destination
+	dw 0x0000 ; offset
+	dw 0x1000 ; destination
 	dq 5	; Kernel lives at sector 5
 
-	; 0xFFFF * 16 + 0x0010 = 0x100000
+	; 0x1000 * 16 + 0x0000 = 0x10000
+	; loads the kernel to 0x10000 in this real mode
 
 ; gdt ( Global Descripter Table )
 gdt_start:
@@ -164,17 +165,30 @@ protected_mode:
 	mov ss, ax
 	mov esp, 0x90000 ; new stack is set up in a safe location
 
-	; CR3 Register - PML4 (Page Mape Level 4)
+	; copy kernel from 0x10000 to 0x100000
+	; exc must match DAP sector count: 64 sectors * 512 / 4 = 8192 dwords
+	mov esi, 0x10000	; source -> where we loaded the kernel
+	mov edi, 0x100000	; destination -> where kernel should live
+	mov ecx, 8192		; 8192 * 4 bytes = 32 KB.
+	rep movsd
+
+	; rep movsd copy 4 bytes from [ESI] to [EDI], advance both by 4, decrements ECX
+	;-and repeats until EXC is 0.
+	; ex: If exc is only 3, then it will copy 4*3 = 12 bytes starting
+	;-from esi address and then paste that starting from edi address.
+
+	; CR3 Register:
+	; -> PML4 (Page Map Level 4)
 	;	-> PDPT (Page Directory Pointer Table)
 	;		-> PD (Page Directory)
 	;			-> PT (Page Table)
 	;				-> Physical Page
 
-	; clear pages by zero out 12KB starting at 0x1000
+	; clear pages by zero out 24KB starting at 0x1000
 	mov edi, 0x1000		; edi -> destination index
 	mov cr3, edi		; CR3(control register 3) points at PML4
 	xor eax, eax		; eax -> accumulator register, ecx -> counter register
-	mov ecx, 3072		; 3072 * 4 bytes = 12KB
+	mov ecx, 6144		; 6144 * 4 bytes = 24KB, have 6 tables
 	rep stosd		; repeat: store EAX into [EDI], advance EDI
 	mov edi, cr3		; resets EDI back to 0x1000
 
@@ -182,12 +196,71 @@ protected_mode:
 	; flags: present (bit 0) + writable (bit 1) = 0x3
 	mov dword [0x1000], 0x2003
 
+	; PDPT has 4 entries, one per GB
 	; PDPT[0] points at PD at 0x3000
-	mov dword [0x2000], 0x3003
+	mov dword [0x2000], 0x3003 ; 0GB - 1GB
+	mov dword [0x2008], 0x4003 ; 1GB - 2GB
+	mov dword [0x2010], 0x5003 ; 2GB - 3GB
+	mov dword [0x2018], 0x6003 ; 3GB - 4GB
+
+	; fill each PD with 512 huge page entries
+	; PDO at 0x3000 -> covers 0x00000000 to 0x3FFFFFFF ( 1GB mem )
+	mov edi, 0x3000		; point EDI at the start of PD0.
+	mov ebx, 0x00000083	; 0x00000000 is the physical address this entry maps to
+				; 0x83 is the flag ( present + writable + hugepage )
+	; meaning "Virtual address in this range maps to physical address 0x00000000, and
+	;-its a 2MB huge page"
+	mov ecx, 512		; ECX is the loop counter 512 ( 2MB x 512 = 1GB )
+	.pd0:
+		mov dword [edi], ebx	; write current entry val to PD at address on EDI
+		add edi, 8		; advance the pointer by 8 bytes
+		add ebx, 0x200000	; advance physical address of EDI by 2MB
+		loop .pd0
+
+	; PD1 at 0x4000 -> covers 0x40000000 to 0x7FFFFFFF
+	mov edi, 0x4000		
+	mov ebx, 0x40000083	; 1GB more than 0x00000000 (+ 0x40000000)
+	mov ecx, 512
+	.pd1:
+		mov dword [edi], ebx
+		add edi, 8
+		add ebx, 0x200000
+		loop .pd1
+
+	; PD2 at 0x5000 -> covers 0x80000000 to 0xBFFFFFFF
+	mov edi, 0x5000
+	mov ebx, 0x80000083
+	mov ecx, 512
+	.pd2:
+		mov dword [edi], ebx
+		add edi, 8
+		add ebx, 0x200000
+		loop .pd2
+
+	; PD3 at 0x6000 -> covers 0xC0000000 to 0xFFFFFFFF
+	mov edi, 0x6000
+	mov ebx, 0xC0000083
+	mov ecx, 512
+	.pd3:
+		mov dword [edi], ebx
+		add edi, 8
+		add ebx, 0x200000
+		loop .pd3
+
+	; Additional fact -> 2MB size is not something you specify as a number anywhere,
+	;-its a fixed property of the paging structure level. Each page table hierchy has a
+	;-fixed coverage size:
+	;	PML4 entry -> covers 512GB each
+	;	PDPT entry -> covers 1GB each
+	;	PD entry   -> covers 2MB each (when huge page bit is set)
+	;	PT entry   -> covers 4KB each
+
 
 	; PD[0] points at first 2MB Using a huge page
 	; flags: present + writable + huge page (bit 7) = 0x83 (10000011)
-	mov dword [0x3000], 0x83
+	; mov dword [0x3000], 0x83 -- [REMOVED for expanding the page table]
+	
+	; ------> <------
 
 	; Enable PAE (Physical address extension) - bit 5 of CR4
 	mov eax, cr4

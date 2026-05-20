@@ -44,4 +44,6 @@ dd if=boot2.bin of=wand.img bs=512 seek=1 conv=notrunc 2>/dev/null
 dd if=kernel.bin of=wand.img bs=512 seek=5 conv=notrunc 2>/dev/null
 
 echo "Build Complete. Running QEMU..."
-qemu-system-x86_64 -drive format=raw,file=wand.img
+# qemu-system-x86_64 -drive format=raw,file=wand.img -monitor stdio
+# qemu-system-x86_64 -drive format=raw,file=wand.img
+qemu-system-x86_64 -drive format=raw,file=wand.img -monitor stdio -S
