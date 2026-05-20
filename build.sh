@@ -40,5 +40,8 @@ dd if=boot1.bin of=wand.img bs=512 seek=0 conv=notrunc 2>/dev/null
 # Write stage 2 to sector 1
 dd if=boot2.bin of=wand.img bs=512 seek=1 conv=notrunc 2>/dev/null
 
+# Write Kernel to sector 5
+dd if=kernel.bin of=wand.img bs=512 seek=5 conv=notrunc 2>/dev/null
+
 echo "Build Complete. Running QEMU..."
 qemu-system-x86_64 -drive format=raw,file=wand.img
