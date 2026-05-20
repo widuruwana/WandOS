@@ -4,8 +4,8 @@ Writing a 64-bit OS targeting 800x600 from scratch, with no GRUB or any librarie
 
 ## Status
 - [x] Stage 1 bootloader
-- [ ] Stage 2 bootloader
-- [ ] Long mode
+- [x] Stage 2 bootloader
+- [x] Long mode
 - [ ] Framebuffer
 - [ ] Kernel
 
