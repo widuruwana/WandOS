@@ -6,11 +6,11 @@ void kernel_main(unsigned int *vbe_info){
 	
 	int tot_bytes = 800 * 600 * 4;
 
-	for(int i = 0; i < tot_bytes; i++){
+	for(int i = 0; i < tot_bytes; i += 4 ){
 		fb[i] = 0xFF; // Blue
-		//fb[i+1] = 0xFF; // Green
-		//fb[i+2] = 0xFF; // Red
-		//fb[i+3] = 0x00; // Alpha
+		fb[i+1] = 0xFF; // Green
+		fb[i+2] = 0xFF; // Red
+		fb[i+3] = 0x00; // Alpha
 	}
 
 	//unsigned int *debug = (unsigned int *)0x150000;

@@ -13,6 +13,18 @@ start:
 	int 0x10
 	; The Physical framebuffer sits at 0x7000 + 40(offset) into the structure.
 
+	; Loading the kernel
+	mov si, kernel_dap
+	mov ah, 0x42
+	mov dl, [0x500]
+	int 0x13
+
+	jnc done_loading_kernel ; if no carry it means read succeeded
+	mov si, msg_kernel_fail	; point SI to error message
+	call print_string	; call print function
+	jmp hang		; hang forevah!
+
+done_loading_kernel:
 	; VESA BIOS Extension (VBE)
 	; VESA function: Set video mode
 	mov ax, 0x4F02
@@ -26,13 +38,38 @@ start:
 	; 0x4000 sets Bit 14. Linear Framebuffer (LFB) flag.
 	int 0x10 ; call bios video services
 
-	; Loading the kernel
-	mov si, kernel_dap
-	mov ah, 0x42
-	mov dl, [0x500]
-	int 0x13
+	cmp ax, 0x004F	; All VESA calls return 0x004F in AX on success, any other return code
+			; should be taken as an error.
+	je done_setting_VESA
 
+	mov si, msg_vesa_fail
+	call print_string
+	jmp hang		; hang forevah!
+
+done_setting_VESA:
 	jmp setup_gdt
+
+hang:
+	hlt
+	jmp hang
+
+print_string:
+	lodsb ; Dereferencing a character at SI and loads it to AL and also increments SI
+	cmp AL, 0
+	je end_string 	; if null terminator found, jump
+
+	mov ah, 0x0E
+	int 0x10	; prints the letter
+	jmp print_string
+
+end_string:
+	ret	; returns back to the instruction that comes after the original function call
+
+msg_kernel_fail:
+	db "Kernel load failed", 0 ; 0 is the null terminator
+
+msg_vesa_fail:
+	db "VESA mode failed", 0
 
 ; Loading the Kernal
 kernel_dap:
