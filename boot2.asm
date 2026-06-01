@@ -2,6 +2,12 @@
 [ORG 0x7E00]
 
 start:
+	mov si, msg_header
+	call print_string
+
+	mov si, msg_quote
+	call print_string
+
 	; Enable A20 to use 0x100000 for loading ther Kernel
 	mov ax, 0x2401
 	int 0x15
@@ -25,6 +31,15 @@ start:
 	jmp hang		; hang forevah!
 
 done_loading_kernel:
+	; wait ~3 seconds ( 18,2 ticks per sec * 3 = ~55 ticks)
+	mov ecx, 55
+	wait_loop:
+		mov eax, [0x46C] ; read current tick count
+		wait_tick:
+			cmp [0x46C], eax ; is the tick counter changed?
+			je wait_tick	 ; if not keep waiting
+			loop wait_loop	 ; if yes decrement and loop
+
 	; VESA BIOS Extension (VBE)
 	; VESA function: Set video mode
 	mov ax, 0x4F02
@@ -64,6 +79,16 @@ print_string:
 
 end_string:
 	ret	; returns back to the instruction that comes after the original function call
+
+msg_header:
+	db "Wood v0.1 - WandOS Bootloader", 13, 10, 10, 0
+	; in real mode 13 is carriage return (moves cursor to the start of the line)
+	; 10 means newline (moves the cursor downs the line)
+
+msg_quote:
+	db "It was the quietest wood you could possibly imagine.", 13, 10
+	db "There were no clocks, no bugs, no processes, and no current.", 13, 10
+	db "You could almost feel the silicon growing...", 13, 10, 10, 0
 
 msg_kernel_fail:
 	db "Kernel load failed", 0 ; 0 is the null terminator
