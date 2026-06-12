@@ -12,6 +12,28 @@ start:
 	mov ax, 0x2401
 	int 0x15
 
+	; When destination is a register, NASM know the size automatically from the
+	;-register name,
+	;	al -> 8-bit -> byte
+	;	ax -> 16-bit -> word
+	;	eax -> 32-bit -> dword
+	
+	; when destination is just a memory address have to specify
+
+	; A20 verification
+	; in real mode NASM assumes 16-bit addresses by default
+	; since 0x100600 is above 0xFFFF NASM warns about address overflow
+	; dword prefix tells NASM to encode this as 32-but address
+	mov byte [dword 0x00600], 0x43	; 67 RAHHHH!
+	mov byte [dword 0x100600], 0x45 ; 69
+	cmp byte [0x00600], 0x45
+	
+	jne done_setting_A20
+	mov si, msg_A20_verification_fail
+	call print_string
+	jmp hang		; hang forevah!
+
+done_setting_A20:
 	; Query VBE mode info
 	mov ax, 0x4F01		; VBE function: get mode info
 	mov cx, 0x114		; Mode number
@@ -89,6 +111,9 @@ msg_quote:
 	db "It was the quietest wood you could possibly imagine.", 13, 10
 	db "There were no clocks, no bugs, no processes, and no current.", 13, 10
 	db "You could almost feel the silicon growing...", 13, 10, 10, 0
+
+msg_A20_verification_fail:
+	db "A20 verification failed", 0
 
 msg_kernel_fail:
 	db "Kernel load failed", 0 ; 0 is the null terminator
