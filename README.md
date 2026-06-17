@@ -1,4 +1,4 @@
-# WandOS v0.0.1
+# WandOS v0.1.0
 
 Writing a 64-bit OS targeting 800x600 from scratch, with no GRUB or any libraries.
 
