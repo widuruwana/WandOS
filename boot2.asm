@@ -41,6 +41,14 @@ done_setting_A20:
 	int 0x10
 	; The Physical framebuffer sits at 0x7000 + 40(offset) into the structure.
 
+	cmp ax, 0x004F	; All VESA calls return 0x004F in AX on success, any other return code
+			; should be taken as an error.
+	je done_vbe_query
+	mov si, msg_vbe_query_fail
+	call print_string
+	jmp hang	; hang forevah;
+
+done_vbe_query:
 	; Loading the kernel
 	mov si, kernel_dap
 	mov ah, 0x42
@@ -75,8 +83,7 @@ done_loading_kernel:
 	; 0x4000 sets Bit 14. Linear Framebuffer (LFB) flag.
 	int 0x10 ; call bios video services
 
-	cmp ax, 0x004F	; All VESA calls return 0x004F in AX on success, any other return code
-			; should be taken as an error.
+	cmp ax, 0x004F	
 	je done_setting_VESA
 
 	mov si, msg_vesa_fail
@@ -114,6 +121,9 @@ msg_quote:
 
 msg_A20_verification_fail:
 	db "A20 verification failed", 0
+
+msg_vbe_query_fail:
+	db "VBE query failed", 13, 10, 0
 
 msg_kernel_fail:
 	db "Kernel load failed", 0 ; 0 is the null terminator
