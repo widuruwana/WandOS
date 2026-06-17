@@ -389,3 +389,7 @@ long_mode:
 
 	jmp 0x100000
 
+; %if is NASM preprocessor conditional branching that gets evaluated at assembly time
+%if ($ - $$) > 1536
+	%error "Wood Stage 2 exceeds 3 sectors. Increase DAP sector count in boot1.asm"
+%endif
