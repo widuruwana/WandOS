@@ -1,3 +1,51 @@
+;---------------------------> <-------------------------------
+;			WOOD Stage 2
+; Wood is the bootloader I am currently making from scratch for
+; my custom operating system that I plan to also write from scratch.
+; I inspired the name for this project by looking at one of my
+; favorite fantasy stories; The Chronicals of Narnia. The place
+; in between all the worlds is called the Wood between worlds
+; where each world's entrace is a pond and the place is so
+; silent that you can almost hear the trees growing, and I thought
+; this maps to the concept of a bootloader quite perfectly.
+; I cannot wait to discover all the cool shit that I cant see.
+;
+; The boot sequence is as follows,
+;	1. enable A20 line
+;	2. A20 verification
+;	3. VBE mode info get queried to 0x7000
+;	4. Kernel loaded from sector 5 to 0x10000
+;	5. VESA 800x600x32bpp is set
+;	6. load global descriptor table
+;	7. Enter protected mode
+;	8. Copy kernel from 0x10000 to 0x100000
+;	9. Map a 4GB page table
+;	10. Enable PAE
+;	11. Enable Long mode
+;	12. Enable paging
+;	13. Far jump to 64-bit code segment
+;	14. Jump to kernel
+;
+;-----------------------------------> <----------------------------------------------
+;			         Memory Map
+; 0x00000 - 0x003FF  | Interrupt Vector Table        | (BIOS)
+; 0x00400 - 0x004FF  | BIOS Data Area                | (BIOS)
+; 0x00500            | Boot drive number             | (written by boot1.asm)
+; 0x00600            | A20 verification scratch byte | (temporary)
+; 0x01000 - 0x01FFF  | PML4                          | (page table level 4)
+; 0x02000 - 0x02FFF  | PDPT                          | (page directory pointer table)
+; 0x03000 - 0x03FFF  | PD0                           | (maps 0x00000000 - 0x3FFFFFFF)
+; 0x04000 - 0x04FFF  | PD1                           | (maps 0x40000000 - 0x7FFFFFFF)
+; 0x05000 - 0x05FFF  | PD2                           | (maps 0x80000000 - 0xBFFFFFFF)
+; 0x06000 - 0x06FFF  | PD3                           | (maps 0xC0000000 - 0xFFFFFFFF)
+; 0x07000 - 0x070FF  | VBE mode info block           | (written by BIOS)
+; 0x07C00 - 0x07DFF  | Stage 1 (boot1.asm)           | (loaded by BIOS)
+; 0x07E00 - 0x087FF  | Stage 2 (boot2.asm)           | (loaded by Stage 1, this file)
+; 0x10000 - 0x17FFF  | Kernel temporary landing      | (loaded from disk sector 5)
+; 0x90000            | Stack base                    | (grows downward)
+; 0xA0000 - 0xFFFFF  | Video memory and BIOS ROM     | (hardware)
+; 0x100000           | Kernel final address          | (copied from 0x10000)
+
 [BITS 16]
 [ORG 0x7E00]
 
@@ -66,7 +114,7 @@ done_loading_kernel:
 	wait_loop:
 		mov eax, [0x46C] ; read current tick count
 		wait_tick:
-			cmp [0x46C], eax ; is the tick counter changed?
+			cmp dword [0x46C], eax ; is the tick counter changed?
 			je wait_tick	 ; if not keep waiting
 			loop wait_loop	 ; if yes decrement and loop
 
@@ -88,7 +136,7 @@ done_loading_kernel:
 
 	mov si, msg_vesa_fail
 	call print_string
-	jmp hang		; hang forevah!
+	jmp hang	; hang forevah!
 
 done_setting_VESA:
 	jmp setup_gdt
@@ -120,16 +168,16 @@ msg_quote:
 	db "You could almost feel the silicon growing...", 13, 10, 10, 0
 
 msg_A20_verification_fail:
-	db "A20 verification failed", 0
+	db "A20 verification failed", 13, 10, 0
 
 msg_vbe_query_fail:
 	db "VBE query failed", 13, 10, 0
 
 msg_kernel_fail:
-	db "Kernel load failed", 0 ; 0 is the null terminator
+	db "Kernel load failed", 13, 10, 0 ; 0 is the null terminator
 
 msg_vesa_fail:
-	db "VESA mode failed", 0
+	db "VESA mode failed", 13, 10, 0
 
 ; Loading the Kernal
 kernel_dap:
