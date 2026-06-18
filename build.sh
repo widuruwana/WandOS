@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Assemble bootloader stages
-nasm -f bin boot1.asm -o boot1.bin
-nasm -f bin boot2.asm -o boot2.bin
+nasm -f bin boot/boot1.asm -o boot1.bin
+nasm -f bin boot/boot2.asm -o boot2.bin
 
 # compile kernel
-nasm -f elf64 kernel_entry.asm -o kernel_entry.o
-gcc -ffreestanding -mno-red-zone -m64 -c kernel.c -o kernel.o
-ld -T kernel.ld -o kernel.bin --oformat binary kernel_entry.o kernel.o
+nasm -f elf64 kernel/kernel_entry.asm -o kernel_entry.o
+gcc -ffreestanding -mno-red-zone -m64 -c kernel/kernel.c -o kernel.o
+ld -T kernel/kernel.ld -o kernel.bin --oformat binary kernel_entry.o kernel.o
 
 # -f elf64 -> unlike the bootloader which used -f bin, the kernel entry
 #-is assembled into ELF format, which is the standard object file format that
