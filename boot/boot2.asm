@@ -1,5 +1,5 @@
 ;---------------------------> <-------------------------------
-;			WOOD Stage 2
+; 						WOOD Stage 2
 ; Wood is the bootloader I am currently making from scratch for
 ; my custom operating system that I plan to also write from scratch.
 ; I inspired the name for this project by looking at one of my
@@ -27,7 +27,7 @@
 ;	14. Jump to kernel
 ;
 ;-----------------------------------> <----------------------------------------------
-;			         Memory Map
+;			         			Memory Map
 ; 0x00000 - 0x003FF  | Interrupt Vector Table        | (BIOS)
 ; 0x00400 - 0x004FF  | BIOS Data Area                | (BIOS)
 ; 0x00500            | Boot drive number             | (written by boot1.asm)
